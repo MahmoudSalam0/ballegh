@@ -16,7 +16,21 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _selectedIndex = 0;
 
-  static const _screens = [HomeScreen(), ReportsScreen(), MapScreen()];
+  late final List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      HomeScreen(onViewAllReports: _showReports),
+      const ReportsScreen(),
+      const MapScreen(),
+    ];
+  }
+
+  void _showReports() {
+    setState(() => _selectedIndex = 1);
+  }
 
   void _openAddReport() {
     Navigator.of(context).push(

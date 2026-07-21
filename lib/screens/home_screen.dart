@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_colors.dart';
+import '../data/sample_reports.dart';
+import '../models/report.dart';
+import '../widgets/report_card.dart';
+import '../widgets/statistic_card.dart';
 import 'add_report_screen.dart';
+import 'report_details_screen.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, required this.onViewAllReports});
+
+  final VoidCallback onViewAllReports;
 
   void _openAddReport(BuildContext context) {
     Navigator.of(context).push(
@@ -12,12 +19,29 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
+  void _openReportDetails(BuildContext context, Report report) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => ReportDetailsScreen(report: report),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final inProgressCount = sampleReports
+        .where((report) => report.status == ReportStatus.inProgress)
+        .length;
+    final resolvedCount = sampleReports
+        .where((report) => report.status == ReportStatus.resolved)
+        .length;
+    final latestReports = [...sampleReports]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 124),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 152),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 720),
@@ -30,11 +54,29 @@ class HomeScreen extends StatelessWidget {
                   const SizedBox(height: 28),
                   const _SectionTitle(title: 'نظرة عامة'),
                   const SizedBox(height: 14),
-                  const _StatisticsSection(),
+                  _StatisticsSection(
+                    total: sampleReports.length,
+                    inProgress: inProgressCount,
+                    resolved: resolvedCount,
+                  ),
                   const SizedBox(height: 28),
-                  const _SectionTitle(title: 'أحدث البلاغات'),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: _SectionTitle(title: 'أحدث البلاغات'),
+                      ),
+                      TextButton(
+                        onPressed: onViewAllReports,
+                        child: const Text('عرض الكل'),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 14),
-                  const _LatestReportsPlaceholder(),
+                  _LatestReportsList(
+                    reports: latestReports.take(3).toList(),
+                    onReportTap: (report) =>
+                        _openReportDetails(context, report),
+                  ),
                 ],
               ),
             ),
@@ -114,6 +156,7 @@ class _HeroCard extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final height = (constraints.maxWidth * 0.72).clamp(260.0, 290.0);
+        final compact = constraints.maxWidth < 360;
 
         return Container(
           decoration: BoxDecoration(
@@ -158,7 +201,7 @@ class _HeroCard extends StatelessWidget {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.all(22),
+                    padding: EdgeInsets.all(compact ? 18 : 22),
                     child: Align(
                       alignment: AlignmentDirectional.centerStart,
                       child: ConstrainedBox(
@@ -168,27 +211,41 @@ class _HeroCard extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'لاحظت مشكلة في منطقتك؟',
+                              'شاهدت ضرراً أو احتياجاً في منطقتك؟',
                               textAlign: TextAlign.right,
-                              style: Theme.of(context).textTheme.titleLarge
-                                  ?.copyWith(
-                                    color: AppColors.surface,
-                                    fontWeight: FontWeight.w800,
-                                    height: 1.35,
-                                  ),
+                              style:
+                                  (compact
+                                          ? Theme.of(
+                                              context,
+                                            ).textTheme.titleMedium
+                                          : Theme.of(
+                                              context,
+                                            ).textTheme.titleLarge)
+                                      ?.copyWith(
+                                        color: AppColors.surface,
+                                        fontWeight: FontWeight.w800,
+                                        height: 1.35,
+                                      ),
                             ),
-                            const SizedBox(height: 10),
+                            SizedBox(height: compact ? 8 : 10),
                             Text(
-                              'أرسل بلاغاً وساهم في تحسين المكان من حولك',
+                              'أرسل بلاغاً مدنياً وساهم في تنظيم احتياجات مجتمعك.',
                               textAlign: TextAlign.right,
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(
-                                    color: AppColors.surface,
-                                    height: 1.6,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                              style:
+                                  (compact
+                                          ? Theme.of(
+                                              context,
+                                            ).textTheme.bodySmall
+                                          : Theme.of(
+                                              context,
+                                            ).textTheme.bodyMedium)
+                                      ?.copyWith(
+                                        color: AppColors.surface,
+                                        height: 1.6,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                             ),
-                            const SizedBox(height: 20),
+                            SizedBox(height: compact ? 16 : 20),
                             FilledButton.icon(
                               onPressed: onAddReport,
                               style: FilledButton.styleFrom(
@@ -232,55 +289,66 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _StatisticsSection extends StatelessWidget {
-  const _StatisticsSection();
+  const _StatisticsSection({
+    required this.total,
+    required this.inProgress,
+    required this.resolved,
+  });
+
+  final int total;
+  final int inProgress;
+  final int resolved;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        const cards = [
-          _StatisticCard(
+        final cards = [
+          StatisticCard(
             title: 'إجمالي البلاغات',
-            value: '12',
+            value: total.toString(),
             icon: Icons.assignment_outlined,
             color: AppColors.primary,
           ),
-          _StatisticCard(
+          StatisticCard(
             title: 'قيد المعالجة',
-            value: '5',
+            value: inProgress.toString(),
             icon: Icons.schedule_rounded,
             color: AppColors.accent,
           ),
-          _StatisticCard(
+          StatisticCard(
             title: 'تم الحل',
-            value: '7',
+            value: resolved.toString(),
             icon: Icons.check_circle_outline_rounded,
             color: AppColors.success,
           ),
         ];
 
         if (constraints.maxWidth < 380) {
-          return const Column(
+          return Column(
             children: [
-              _StatisticCard.horizontal(
+              StatisticCard(
                 title: 'إجمالي البلاغات',
-                value: '12',
+                value: total.toString(),
                 icon: Icons.assignment_outlined,
                 color: AppColors.primary,
+                horizontal: true,
               ),
-              SizedBox(height: 10),
-              _StatisticCard.horizontal(
+              const SizedBox(height: 10),
+              StatisticCard(
                 title: 'قيد المعالجة',
-                value: '5',
+                value: inProgress.toString(),
                 icon: Icons.schedule_rounded,
                 color: AppColors.accent,
+                horizontal: true,
               ),
-              SizedBox(height: 10),
-              _StatisticCard.horizontal(
+              const SizedBox(height: 10),
+              StatisticCard(
                 title: 'تم الحل',
-                value: '7',
+                value: resolved.toString(),
                 icon: Icons.check_circle_outline_rounded,
                 color: AppColors.success,
+                horizontal: true,
               ),
             ],
           );
@@ -301,117 +369,24 @@ class _StatisticsSection extends StatelessWidget {
   }
 }
 
-class _StatisticCard extends StatelessWidget {
-  const _StatisticCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.color,
-  }) : horizontal = false;
+class _LatestReportsList extends StatelessWidget {
+  const _LatestReportsList({required this.reports, required this.onReportTap});
 
-  const _StatisticCard.horizontal({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.color,
-  }) : horizontal = true;
-
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
-  final bool horizontal;
+  final List<Report> reports;
+  final ValueChanged<Report> onReportTap;
 
   @override
   Widget build(BuildContext context) {
-    final iconBox = Container(
-      width: 38,
-      height: 38,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(13),
-      ),
-      child: Icon(icon, color: color, size: 21),
-    );
-    final valueText = Text(
-      value,
-      style: Theme.of(
-        context,
-      ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
-    );
-    final titleText = Text(
-      title,
-      maxLines: 2,
-      overflow: TextOverflow.ellipsis,
-      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-        color: AppColors.textSecondary,
-        height: 1.35,
-      ),
-    );
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: horizontal
-            ? Row(
-                children: [
-                  iconBox,
-                  const SizedBox(width: 12),
-                  Expanded(child: titleText),
-                  const SizedBox(width: 12),
-                  valueText,
-                ],
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  iconBox,
-                  const SizedBox(height: 14),
-                  valueText,
-                  const SizedBox(height: 4),
-                  titleText,
-                ],
-              ),
-      ),
-    );
-  }
-}
-
-class _LatestReportsPlaceholder extends StatelessWidget {
-  const _LatestReportsPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
-        child: Column(
-          children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: const Icon(
-                Icons.inbox_outlined,
-                color: AppColors.primary,
-                size: 27,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              'ستظهر أحدث البلاغات هنا',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return Column(
+      children: [
+        for (var index = 0; index < reports.length; index++) ...[
+          ReportCard(
+            report: reports[index],
+            onTap: () => onReportTap(reports[index]),
+          ),
+          if (index < reports.length - 1) const SizedBox(height: 12),
+        ],
+      ],
     );
   }
 }

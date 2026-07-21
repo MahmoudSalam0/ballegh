@@ -18,21 +18,26 @@ class HomeScreen extends StatelessWidget {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 124),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const _AppHeader(),
-              const SizedBox(height: 24),
-              _HeroCard(onAddReport: () => _openAddReport(context)),
-              const SizedBox(height: 28),
-              const _SectionTitle(title: 'نظرة عامة'),
-              const SizedBox(height: 14),
-              const _StatisticsSection(),
-              const SizedBox(height: 28),
-              const _SectionTitle(title: 'أحدث البلاغات'),
-              const SizedBox(height: 14),
-              const _LatestReportsPlaceholder(),
-            ],
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const _AppHeader(),
+                  const SizedBox(height: 24),
+                  _HeroCard(onAddReport: () => _openAddReport(context)),
+                  const SizedBox(height: 28),
+                  const _SectionTitle(title: 'نظرة عامة'),
+                  const SizedBox(height: 14),
+                  const _StatisticsSection(),
+                  const SizedBox(height: 28),
+                  const _SectionTitle(title: 'أحدث البلاغات'),
+                  const SizedBox(height: 14),
+                  const _LatestReportsPlaceholder(),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -47,17 +52,28 @@ class _AppHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(
-          width: 54,
-          height: 54,
-          decoration: BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: const Icon(
-            Icons.campaign_rounded,
-            color: AppColors.surface,
-            size: 30,
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Image.asset(
+            'assets/images/ballegh.jpeg',
+            width: 60,
+            height: 60,
+            fit: BoxFit.contain,
+            semanticLabel: 'شعار بلّغ',
+            errorBuilder: (context, error, stackTrace) {
+              return const ColoredBox(
+                color: AppColors.primary,
+                child: SizedBox(
+                  width: 60,
+                  height: 60,
+                  child: Icon(
+                    Icons.place_rounded,
+                    color: AppColors.surface,
+                    size: 30,
+                  ),
+                ),
+              );
+            },
           ),
         ),
         const SizedBox(width: 14),
@@ -95,66 +111,106 @@ class _HeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.16),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final height = (constraints.maxWidth * 0.72).clamp(260.0, 290.0);
+
+        return Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.18),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: AppColors.surface.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: AppColors.surface.withValues(alpha: 0.18),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: SizedBox(
+              width: double.infinity,
+              height: height,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(
+                    'assets/images/ballegh2.jpeg',
+                    width: double.infinity,
+                    height: height,
+                    fit: BoxFit.cover,
+                    alignment: Alignment.centerLeft,
+                    semanticLabel: 'شخص يرسل بلاغاً عن مشكلة في الشارع',
+                    errorBuilder: (context, error, stackTrace) {
+                      return const ColoredBox(color: AppColors.primary);
+                    },
+                  ),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerRight,
+                        end: Alignment.centerLeft,
+                        colors: [
+                          AppColors.primary.withValues(alpha: 0.64),
+                          AppColors.primary.withValues(alpha: 0.42),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(22),
+                    child: Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 320),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'لاحظت مشكلة في منطقتك؟',
+                              textAlign: TextAlign.right,
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(
+                                    color: AppColors.surface,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1.35,
+                                  ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              'أرسل بلاغاً وساهم في تحسين المكان من حولك',
+                              textAlign: TextAlign.right,
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: AppColors.surface,
+                                    height: 1.6,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                            ),
+                            const SizedBox(height: 20),
+                            FilledButton.icon(
+                              onPressed: onAddReport,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.accent,
+                                foregroundColor: AppColors.textPrimary,
+                              ),
+                              icon: const Icon(
+                                Icons.add_circle_outline_rounded,
+                              ),
+                              label: const Text('أضف بلاغاً'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            child: const Icon(
-              Icons.location_city_rounded,
-              color: AppColors.surface,
-              size: 28,
-            ),
           ),
-          const SizedBox(height: 20),
-          Text(
-            'لاحظت مشكلة في منطقتك؟',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: AppColors.surface,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'أرسل بلاغاً وساهم في تحسين المكان من حولك',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppColors.surface.withValues(alpha: 0.84),
-              height: 1.6,
-            ),
-          ),
-          const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: onAddReport,
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.accent,
-              foregroundColor: AppColors.textPrimary,
-            ),
-            icon: const Icon(Icons.add_circle_outline_rounded),
-            label: const Text('أضف بلاغاً'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

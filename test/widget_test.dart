@@ -19,6 +19,13 @@ void main() {
     expect(find.text('البلاغات'), findsOneWidget);
     expect(find.text('الخريطة'), findsOneWidget);
 
+    final assetNames = tester
+        .widgetList<Image>(find.byType(Image))
+        .where((image) => image.image is AssetImage)
+        .map((image) => (image.image as AssetImage).assetName);
+    expect(assetNames, contains('assets/images/ballegh.jpeg'));
+    expect(assetNames, contains('assets/images/ballegh2.jpeg'));
+
     final textContext = tester.element(find.text('معاً لمكان أفضل'));
     expect(Directionality.of(textContext), TextDirection.rtl);
     expect(Theme.of(textContext).colorScheme.primary, AppColors.primary);

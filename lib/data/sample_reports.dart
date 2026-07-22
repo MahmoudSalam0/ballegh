@@ -2,7 +2,7 @@ import '../models/report.dart';
 
 final sampleReports = <Report>[
   Report(
-    id: 'R-001',
+    id: 1,
     title: 'أنقاض تغلق مدخل شارع سكني',
     description:
         'تمنع الأنقاض مرور المركبات والخدمات عبر المدخل الرئيسي للشارع.',
@@ -12,7 +12,7 @@ final sampleReports = <Report>[
     status: ReportStatus.newReport,
   ),
   Report(
-    id: 'R-002',
+    id: 2,
     title: 'انقطاع مياه عن منطقة سكنية',
     description: 'تعاني عدة مبانٍ سكنية من انقطاع المياه منذ ساعات الصباح.',
     category: ReportCategory.waterAndSanitation,
@@ -21,7 +21,7 @@ final sampleReports = <Report>[
     status: ReportStatus.inProgress,
   ),
   Report(
-    id: 'R-003',
+    id: 3,
     title: 'أسلاك كهرباء مكشوفة قرب الرصيف',
     description: 'توجد أسلاك كهربائية ظاهرة بجانب ممر عام وتحتاج إلى تأمين.',
     category: ReportCategory.electricity,
@@ -30,7 +30,7 @@ final sampleReports = <Report>[
     status: ReportStatus.newReport,
   ),
   Report(
-    id: 'R-004',
+    id: 4,
     title: 'مبنى متضرر يحتاج إلى تقييم',
     description:
         'تظهر أضرار واضحة في واجهة مبنى مدني وتلزم معاينته للتأكد من سلامته.',
@@ -40,7 +40,7 @@ final sampleReports = <Report>[
     status: ReportStatus.inProgress,
   ),
   Report(
-    id: 'R-005',
+    id: 5,
     title: 'حاجة إلى مياه شرب ومواد أساسية',
     description:
         'تحتاج المنطقة إلى إمدادات مياه شرب وبعض المواد المنزلية الأساسية.',
@@ -50,7 +50,7 @@ final sampleReports = <Report>[
     status: ReportStatus.newReport,
   ),
   Report(
-    id: 'R-006',
+    id: 6,
     title: 'تراكم نفايات في منطقة سكنية',
     description:
         'تراكمت النفايات قرب المساكن وتحتاج إلى جمع للحفاظ على الصحة العامة.',
@@ -60,7 +60,7 @@ final sampleReports = <Report>[
     status: ReportStatus.resolved,
   ),
   Report(
-    id: 'R-007',
+    id: 7,
     title: 'لوحة إرشادية ساقطة في الطريق',
     description:
         'تعيق لوحة إرشادية ساقطة جزءاً من الممر العام وتحتاج إلى إزالتها.',

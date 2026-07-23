@@ -1,5 +1,6 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:ballegh_app/models/report.dart';
 
 class DatabaseHelper {
   DatabaseHelper._internal();
@@ -40,4 +41,7 @@ class DatabaseHelper {
       )
     ''');
   }
+
+
+  
 }

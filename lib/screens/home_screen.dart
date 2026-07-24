@@ -18,18 +18,18 @@ class HomeScreen extends StatelessWidget {
 
   final VoidCallback onViewAllReports;
   final VoidCallback onAddReport;
-  final Future<void> Function() onReportDetailsClosed;
+  final Future<void> Function(bool reportWasDeleted) onReportDetailsClosed;
   final List<Report> reports;
   final bool isLoading;
 
   Future<void> _openReportDetails(BuildContext context, Report report) async {
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
+    final reportWasDeleted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
         builder: (context) => ReportDetailsScreen(report: report),
       ),
     );
 
-    await onReportDetailsClosed();
+    await onReportDetailsClosed(reportWasDeleted == true);
   }
 
   @override

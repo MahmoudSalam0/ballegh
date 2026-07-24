@@ -84,14 +84,21 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Future<void> _openDetails(Report report) async {
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
+    final reportWasDeleted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
         builder: (context) => ReportDetailsScreen(report: report),
       ),
     );
 
     if (!mounted) {
       return;
+    }
+
+    if (reportWasDeleted == true) {
+      setState(() {
+        _isLoading = true;
+        _hasLoadError = false;
+      });
     }
 
     await _loadReports();

@@ -68,6 +68,12 @@ class DatabaseHelper {
     );
   }
 
+  Future<int> deleteReport(int id) async {
+    final db = await database;
+
+    return db.delete('reports', where: 'id = ?', whereArgs: [id]);
+  }
+
   Future<List<Report>> getAllReports() async {
     final db = await database;
 

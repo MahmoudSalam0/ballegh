@@ -64,10 +64,16 @@ class _MainShellState extends State<MainShell> {
       return;
     }
 
-    await _refreshReportScreens();
+    await _refreshReportScreens(false);
   }
 
-  Future<void> _refreshReportScreens() async {
+  Future<void> _refreshReportScreens(bool reportWasDeleted) async {
+    if (reportWasDeleted && mounted) {
+      setState(() {
+        _isHomeLoading = true;
+      });
+    }
+
     await _loadHomeReports();
 
     if (!mounted) {

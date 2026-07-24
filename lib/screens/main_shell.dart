@@ -64,6 +64,10 @@ class _MainShellState extends State<MainShell> {
       return;
     }
 
+    await _refreshReportScreens();
+  }
+
+  Future<void> _refreshReportScreens() async {
     await _loadHomeReports();
 
     if (!mounted) {
@@ -81,6 +85,7 @@ class _MainShellState extends State<MainShell> {
       HomeScreen(
         onViewAllReports: _showReports,
         onAddReport: _openAddReport,
+        onReportDetailsClosed: _refreshReportScreens,
         reports: _homeReports,
         isLoading: _isHomeLoading,
       ),

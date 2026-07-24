@@ -83,12 +83,18 @@ class _ReportsScreenState extends State<ReportsScreen> {
     super.dispose();
   }
 
-  void _openDetails(Report report) {
-    Navigator.of(context).push(
+  Future<void> _openDetails(Report report) async {
+    await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (context) => ReportDetailsScreen(report: report),
       ),
     );
+
+    if (!mounted) {
+      return;
+    }
+
+    await _loadReports();
   }
 
   void _clearSearch() {

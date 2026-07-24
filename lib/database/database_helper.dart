@@ -50,6 +50,24 @@ class DatabaseHelper {
     return reportId;
   }
 
+  Future<int> updateReport(Report report) async {
+    if (report.id == null) {
+      throw ArgumentError('لا يمكن تحديث بلاغ بدون id');
+    }
+
+    final db = await database;
+
+    final updatedData = report.toMap();
+    updatedData.remove('id');
+
+    return db.update(
+      'reports',
+      updatedData,
+      where: 'id = ?',
+      whereArgs: [report.id],
+    );
+  }
+
   Future<List<Report>> getAllReports() async {
     final db = await database;
 

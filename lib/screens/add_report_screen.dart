@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 import '../models/report.dart';
 import '../widgets/category_icon.dart';
+import '../database/database_helper.dart';
 
 class AddReportScreen extends StatefulWidget {
   const AddReportScreen({super.key});
@@ -18,6 +19,7 @@ class _AddReportScreenState extends State<AddReportScreen> {
 
   ReportCategory? _selectedCategory;
   bool _showCategoryError = false;
+  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -39,39 +41,89 @@ class _AddReportScreenState extends State<AddReportScreen> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     FocusScope.of(context).unfocus();
+
     final fieldsAreValid = _formKey.currentState?.validate() ?? false;
     final categoryIsValid = _selectedCategory != null;
 
-    setState(() => _showCategoryError = !categoryIsValid);
+    setState(() {
+      _showCategoryError = !categoryIsValid;
+    });
 
-    if (!fieldsAreValid || !categoryIsValid) return;
+    if (!fieldsAreValid || !categoryIsValid) {
+      return;
+    }
 
-    showDialog<void>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          icon: const Icon(
-            Icons.check_circle_outline_rounded,
-            color: AppColors.primary,
-            size: 36,
-          ),
-          title: const Text('البيانات جاهزة', textAlign: TextAlign.center),
-          content: const Text(
-            'تم التحقق من بيانات البلاغ، وسيتم حفظها بعد ربط قاعدة البيانات.',
-            textAlign: TextAlign.center,
-          ),
-          actionsAlignment: MainAxisAlignment.center,
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('حسنًا'),
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      final report = Report(
+        title: _titleController.text.trim(),
+        description: _descriptionController.text.trim(),
+        category: _selectedCategory!,
+        location: 'لم يتم تحديد الموقع',
+        createdAt: DateTime.now(),
+        status: ReportStatus.newReport,
+      );
+
+      final reportId = await DatabaseHelper.instance.insertReport(report);
+
+      if (!mounted) {
+        return;
+      }
+
+      await showDialog<void>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            icon: const Icon(
+              Icons.check_circle_outline_rounded,
+              color: AppColors.primary,
+              size: 36,
             ),
-          ],
+            title: const Text('تم حفظ البلاغ', textAlign: TextAlign.center),
+            content: Text(
+              'تم حفظ البلاغ بنجاح برقم $reportId.',
+              textAlign: TextAlign.center,
+            ),
+            actionsAlignment: MainAxisAlignment.center,
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('حسنًا'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context).pop(true);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('تعذر حفظ البلاغ، يرجى المحاولة مرة أخرى'),
+          ),
         );
-      },
-    );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
   }
 
   @override
@@ -133,9 +185,22 @@ class _AddReportScreenState extends State<AddReportScreen> {
                       width: double.infinity,
                       child: FilledButton.icon(
                         key: const Key('submit-report'),
-                        onPressed: _submit,
-                        icon: const Icon(Icons.send_rounded),
-                        label: const Text('إرسال البلاغ'),
+                        onPressed: _isSaving ? null : _submit,
+                        icon: _isSaving
+                            ? SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onPrimary,
+                                ),
+                              )
+                            : const Icon(Icons.send_rounded),
+                        label: Text(
+                          _isSaving ? 'جارٍ الحفظ...' : 'إرسال البلاغ',
+                        ),
                       ),
                     ),
                   ],

@@ -42,6 +42,21 @@ class DatabaseHelper {
     ''');
   }
 
+  Future<int> insertReport(Report report) async {
+    final db = await database;
 
-  
+    final reportId = await db.insert('reports', report.toMap());
+
+    return reportId;
+  }
+
+  Future<List<Report>> getAllReports() async {
+    final db = await database;
+
+    final reportMaps = await db.query('reports', orderBy: 'createdAt DESC');
+
+    return reportMaps.map((map) {
+      return Report.fromMap(map);
+    }).toList();
+  }
 }

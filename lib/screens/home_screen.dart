@@ -1,23 +1,24 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_colors.dart';
-import '../data/sample_reports.dart';
 import '../models/report.dart';
 import '../widgets/report_card.dart';
 import '../widgets/statistic_card.dart';
-import 'add_report_screen.dart';
 import 'report_details_screen.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key, required this.onViewAllReports});
+  const HomeScreen({
+    super.key,
+    required this.onViewAllReports,
+    required this.onAddReport,
+    required this.reports,
+    required this.isLoading,
+  });
 
   final VoidCallback onViewAllReports;
-
-  void _openAddReport(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (context) => const AddReportScreen()),
-    );
-  }
+  final VoidCallback onAddReport;
+  final List<Report> reports;
+  final bool isLoading;
 
   void _openReportDetails(BuildContext context, Report report) {
     Navigator.of(context).push(
@@ -29,13 +30,13 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final inProgressCount = sampleReports
+    final inProgressCount = reports
         .where((report) => report.status == ReportStatus.inProgress)
         .length;
-    final resolvedCount = sampleReports
+    final resolvedCount = reports
         .where((report) => report.status == ReportStatus.resolved)
         .length;
-    final latestReports = [...sampleReports]
+    final latestReports = [...reports]
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
     return Scaffold(
@@ -50,12 +51,12 @@ class HomeScreen extends StatelessWidget {
                 children: [
                   const _AppHeader(),
                   const SizedBox(height: 24),
-                  _HeroCard(onAddReport: () => _openAddReport(context)),
+                  _HeroCard(onAddReport: onAddReport),
                   const SizedBox(height: 28),
                   const _SectionTitle(title: 'نظرة عامة'),
                   const SizedBox(height: 14),
                   _StatisticsSection(
-                    total: sampleReports.length,
+                    total: reports.length,
                     inProgress: inProgressCount,
                     resolved: resolvedCount,
                   ),
@@ -72,11 +73,21 @@ class HomeScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 14),
-                  _LatestReportsList(
-                    reports: latestReports.take(3).toList(),
-                    onReportTap: (report) =>
-                        _openReportDetails(context, report),
-                  ),
+                  if (isLoading)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
+                  else if (latestReports.isEmpty)
+                    const _NoReportsYet()
+                  else
+                    _LatestReportsList(
+                      reports: latestReports.take(3).toList(),
+                      onReportTap: (report) =>
+                          _openReportDetails(context, report),
+                    ),
                 ],
               ),
             ),
@@ -387,6 +398,42 @@ class _LatestReportsList extends StatelessWidget {
           if (index < reports.length - 1) const SizedBox(height: 12),
         ],
       ],
+    );
+  }
+}
+
+class _NoReportsYet extends StatelessWidget {
+  const _NoReportsYet();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            const Icon(
+              Icons.inbox_outlined,
+              color: AppColors.primary,
+              size: 40,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'لا توجد بلاغات حتى الآن',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'أضف أول بلاغ ليظهر هنا',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

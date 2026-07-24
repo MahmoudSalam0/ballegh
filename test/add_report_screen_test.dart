@@ -95,7 +95,7 @@ void main() {
     await tester.tap(find.byKey(const Key('submit-report')));
     await tester.pumpAndSettle();
 
-    expect(find.text('البيانات جاهزة'), findsOneWidget);
+    expect(find.text('تم حفظ البلاغ'), findsOneWidget);
     expect(
       find.text(
         'تم التحقق من بيانات البلاغ، وسيتم حفظها بعد ربط قاعدة البيانات.',

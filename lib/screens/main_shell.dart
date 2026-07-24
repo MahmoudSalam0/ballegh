@@ -5,6 +5,8 @@ import 'add_report_screen.dart';
 import 'home_screen.dart';
 import 'map_screen.dart';
 import 'reports_screen.dart';
+import '../database/database_helper.dart';
+import '../models/report.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -16,32 +18,77 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _selectedIndex = 0;
 
-  late final List<Widget> _screens;
+  List<Report> _homeReports = [];
+  bool _isHomeLoading = true;
+  int _reportsRefreshVersion = 0;
 
   @override
   void initState() {
     super.initState();
-    _screens = [
-      HomeScreen(onViewAllReports: _showReports),
-      const ReportsScreen(),
-      const MapScreen(),
-    ];
+    _loadHomeReports();
+  }
+
+  Future<void> _loadHomeReports() async {
+    try {
+      final reports = await DatabaseHelper.instance.getAllReports();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _homeReports = reports;
+        _isHomeLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isHomeLoading = false;
+      });
+    }
   }
 
   void _showReports() {
     setState(() => _selectedIndex = 1);
   }
 
-  void _openAddReport() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (context) => const AddReportScreen()),
+  Future<void> _openAddReport() async {
+    final reportWasSaved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(builder: (context) => const AddReportScreen()),
     );
+
+    if (reportWasSaved != true) {
+      return;
+    }
+
+    await _loadHomeReports();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _reportsRefreshVersion++;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final screens = [
+      HomeScreen(
+        onViewAllReports: _showReports,
+        onAddReport: _openAddReport,
+        reports: _homeReports,
+        isLoading: _isHomeLoading,
+      ),
+      ReportsScreen(key: ValueKey(_reportsRefreshVersion)),
+      const MapScreen(),
+    ];
     return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: _screens),
+      body: IndexedStack(index: _selectedIndex, children: screens),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openAddReport,
         tooltip: 'إضافة بلاغ',

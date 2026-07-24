@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_colors.dart';
-import '../data/sample_reports.dart';
+import '../database/database_helper.dart';
 import '../models/report.dart';
 import '../widgets/report_card.dart';
 import 'report_details_screen.dart';
@@ -17,11 +17,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
   final _searchController = TextEditingController();
   String _query = '';
   ReportStatus? _selectedStatus;
+  List<Report> _reports = [];
+  bool _isLoading = true;
+  bool _hasLoadError = false;
 
   List<Report> get _filteredReports {
     final normalizedQuery = _query.trim().toLowerCase();
 
-    return sampleReports.where((report) {
+    return _reports.where((report) {
       final matchesStatus =
           _selectedStatus == null || report.status == _selectedStatus;
       final matchesSearch =
@@ -32,6 +35,46 @@ class _ReportsScreenState extends State<ReportsScreen> {
           report.location.toLowerCase().contains(normalizedQuery);
       return matchesStatus && matchesSearch;
     }).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReports();
+  }
+
+  Future<void> _loadReports() async {
+    try {
+      final reports = await DatabaseHelper.instance.getAllReports();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _reports = reports;
+        _isLoading = false;
+        _hasLoadError = false;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _hasLoadError = true;
+      });
+    }
+  }
+
+  void _retryLoading() {
+    setState(() {
+      _isLoading = true;
+      _hasLoadError = false;
+    });
+
+    _loadReports();
   }
 
   @override
@@ -58,7 +101,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final reports = _filteredReports;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('البلاغات')),
+      appBar: AppBar(
+        title: const Text('البلاغات'),
+        actions: [
+          IconButton(
+            onPressed: _isLoading ? null : _retryLoading,
+            tooltip: 'تحديث البلاغات',
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
+      ),
       body: SafeArea(
         top: false,
         child: Center(
@@ -116,20 +168,29 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 ),
                 const SizedBox(height: 14),
                 Expanded(
-                  child: reports.isEmpty
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _hasLoadError
+                      ? _ReportsLoadError(onRetry: _retryLoading)
+                      : reports.isEmpty
                       ? const _EmptyReportsState()
-                      : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 152),
-                          itemCount: reports.length,
-                          separatorBuilder: (context, index) =>
-                              const SizedBox(height: 12),
-                          itemBuilder: (context, index) {
-                            final report = reports[index];
-                            return ReportCard(
-                              report: report,
-                              onTap: () => _openDetails(report),
-                            );
-                          },
+                      : RefreshIndicator(
+                          onRefresh: _loadReports,
+                          child: ListView.separated(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 152),
+                            itemCount: reports.length,
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(height: 12),
+                            itemBuilder: (context, index) {
+                              final report = reports[index];
+
+                              return ReportCard(
+                                report: report,
+                                onTap: () => _openDetails(report),
+                              );
+                            },
+                          ),
                         ),
                 ),
               ],
@@ -210,6 +271,46 @@ class _EmptyReportsState extends StatelessWidget {
                 color: AppColors.textSecondary,
                 height: 1.5,
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReportsLoadError extends StatelessWidget {
+  const _ReportsLoadError({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.error_outline_rounded,
+              color: Theme.of(context).colorScheme.error,
+              size: 48,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'تعذر تحميل البلاغات',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            const Text('يرجى المحاولة مرة أخرى', textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('إعادة المحاولة'),
             ),
           ],
         ),

@@ -1,10 +1,10 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_colors.dart';
 import '../database/database_helper.dart';
 import '../models/report.dart';
+import '../services/report_image_storage.dart';
+import '../widgets/report_image.dart';
 import '../widgets/status_chip.dart';
 import 'edit_report_screen.dart';
 
@@ -100,12 +100,14 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
     try {
       final deletedRows = await DatabaseHelper.instance.deleteReport(reportId);
 
-      if (!mounted) {
-        return;
-      }
-
       if (deletedRows != 1) {
         throw StateError('لم يتم حذف صف واحد');
+      }
+
+      await ReportImageStorage.instance.deleteManagedImage(_report.imagePath);
+
+      if (!mounted) {
+        return;
       }
 
       await showDialog<void>(
@@ -196,7 +198,14 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                   children: [
                     _ReportHeader(report: _report),
                     const SizedBox(height: 16),
-                    _ReportImage(imagePath: _report.imagePath),
+                    Card(
+                      clipBehavior: Clip.antiAlias,
+                      child: ReportImage(
+                        imagePath: _report.imagePath,
+                        borderRadius: 0,
+                        placeholderText: 'لا توجد صورة متاحة لهذا البلاغ',
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     _DetailsCard(
                       title: 'وصف البلاغ',
@@ -348,86 +357,6 @@ class _CategoryChip extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ReportImage extends StatelessWidget {
-  const _ReportImage({required this.imagePath});
-
-  final String? imagePath;
-
-  @override
-  Widget build(BuildContext context) {
-    final path = imagePath?.trim();
-    final file = path == null || path.isEmpty ? null : File(path);
-    final imageExists = file != null && _fileExists(file);
-
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: AspectRatio(
-        aspectRatio: 16 / 9,
-        child: imageExists
-            ? Image.file(
-                file,
-                fit: BoxFit.cover,
-                semanticLabel: 'صورة البلاغ',
-                errorBuilder: (context, error, stackTrace) =>
-                    const _ImagePlaceholder(),
-              )
-            : const _ImagePlaceholder(),
-      ),
-    );
-  }
-
-  bool _fileExists(File file) {
-    try {
-      return file.existsSync();
-    } on FileSystemException {
-      return false;
-    }
-  }
-}
-
-class _ImagePlaceholder extends StatelessWidget {
-  const _ImagePlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: AppColors.primary.withValues(alpha: 0.05),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.09),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: const Icon(
-                  Icons.image_not_supported_outlined,
-                  color: AppColors.primary,
-                  size: 29,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'لا توجد صورة متاحة لهذا البلاغ',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

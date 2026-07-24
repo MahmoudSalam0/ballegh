@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 import '../models/report.dart';
 import 'category_icon.dart';
+import 'report_image.dart';
 import 'status_chip.dart';
 
 class ReportCard extends StatelessWidget {
@@ -22,6 +23,13 @@ class ReportCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              ReportImage(
+                imagePath: report.imagePath,
+                aspectRatio: 16 / 7,
+                borderRadius: 14,
+                placeholderText: 'لا توجد صورة للبلاغ',
+              ),
+              const SizedBox(height: 14),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

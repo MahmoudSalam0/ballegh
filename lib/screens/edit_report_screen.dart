@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_colors.dart';
 import '../database/database_helper.dart';
 import '../models/report.dart';
+import '../services/report_image_storage.dart';
 import '../widgets/category_icon.dart';
+import '../widgets/report_image_picker_card.dart';
 
 class EditReportScreen extends StatefulWidget {
   const EditReportScreen({super.key, required this.report});
@@ -20,9 +24,14 @@ class _EditReportScreenState extends State<EditReportScreen> {
   late final TextEditingController _descriptionController;
   late final TextEditingController _locationController;
   late ReportCategory _selectedCategory;
+  late String? _imagePath;
 
   bool _showCategoryError = false;
   bool _isSaving = false;
+  bool _isProcessingImage = false;
+  bool _imageChangesWereCommitted = false;
+
+  bool get _isBusy => _isSaving || _isProcessingImage;
 
   @override
   void initState() {
@@ -33,10 +42,14 @@ class _EditReportScreenState extends State<EditReportScreen> {
     );
     _locationController = TextEditingController(text: widget.report.location);
     _selectedCategory = widget.report.category;
+    _imagePath = widget.report.imagePath;
   }
 
   @override
   void dispose() {
+    if (!_imageChangesWereCommitted && _imagePath != widget.report.imagePath) {
+      unawaited(ReportImageStorage.instance.deleteManagedImage(_imagePath));
+    }
     _titleController.dispose();
     _descriptionController.dispose();
     _locationController.dispose();
@@ -44,7 +57,7 @@ class _EditReportScreenState extends State<EditReportScreen> {
   }
 
   void _selectCategory(ReportCategory category) {
-    if (_isSaving) {
+    if (_isBusy) {
       return;
     }
 
@@ -54,8 +67,81 @@ class _EditReportScreenState extends State<EditReportScreen> {
     });
   }
 
+  Future<void> _chooseImage() async {
+    if (_isBusy) {
+      return;
+    }
+
+    final source = await showReportImageSourceSheet(context);
+    if (!mounted || source == null) {
+      return;
+    }
+
+    setState(() {
+      _isProcessingImage = true;
+    });
+
+    try {
+      final newImagePath = await ReportImageStorage.instance.pickAndStore(
+        source,
+      );
+      if (newImagePath == null) {
+        return;
+      }
+
+      if (!mounted) {
+        await ReportImageStorage.instance.deleteManagedImage(newImagePath);
+        return;
+      }
+
+      final previousImagePath = _imagePath;
+      setState(() {
+        _imagePath = newImagePath;
+      });
+
+      if (previousImagePath != widget.report.imagePath) {
+        await ReportImageStorage.instance.deleteManagedImage(previousImagePath);
+      }
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تعذر اختيار الصورة أو حفظها، يرجى المحاولة مرة أخرى',
+            ),
+          ),
+        );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessingImage = false;
+        });
+      }
+    }
+  }
+
+  void _removeImage() {
+    if (_isBusy) {
+      return;
+    }
+
+    final imagePath = _imagePath;
+    setState(() {
+      _imagePath = null;
+    });
+
+    if (imagePath != widget.report.imagePath) {
+      unawaited(ReportImageStorage.instance.deleteManagedImage(imagePath));
+    }
+  }
+
   Future<void> _save() async {
-    if (_isSaving) {
+    if (_isBusy) {
       return;
     }
 
@@ -84,7 +170,7 @@ class _EditReportScreenState extends State<EditReportScreen> {
       location: _locationController.text.trim(),
       latitude: widget.report.latitude,
       longitude: widget.report.longitude,
-      imagePath: widget.report.imagePath,
+      imagePath: _imagePath,
       createdAt: widget.report.createdAt,
       status: widget.report.status,
     );
@@ -94,12 +180,19 @@ class _EditReportScreenState extends State<EditReportScreen> {
         updatedReport,
       );
 
-      if (!mounted) {
-        return;
-      }
-
       if (updatedRows != 1) {
         throw StateError('لم يتم تحديث صف واحد');
+      }
+
+      _imageChangesWereCommitted = true;
+      if (widget.report.imagePath != _imagePath) {
+        await ReportImageStorage.instance.deleteManagedImage(
+          widget.report.imagePath,
+        );
+      }
+
+      if (!mounted) {
+        return;
       }
 
       await showDialog<void>(
@@ -184,20 +277,28 @@ class _EditReportScreenState extends State<EditReportScreen> {
                     _EditCategorySection(
                       selectedCategory: _selectedCategory,
                       showError: _showCategoryError,
-                      enabled: !_isSaving,
+                      enabled: !_isBusy,
                       onSelected: _selectCategory,
+                    ),
+                    const SizedBox(height: 16),
+                    ReportImagePickerCard(
+                      imagePath: _imagePath,
+                      isLoading: _isProcessingImage,
+                      enabled: !_isSaving,
+                      onChoose: _chooseImage,
+                      onRemove: _removeImage,
                     ),
                     const SizedBox(height: 16),
                     _EditFieldsSection(
                       titleController: _titleController,
                       descriptionController: _descriptionController,
                       locationController: _locationController,
-                      enabled: !_isSaving,
+                      enabled: !_isBusy,
                     ),
                     const SizedBox(height: 24),
                     FilledButton.icon(
                       key: const Key('save-report-changes'),
-                      onPressed: _isSaving ? null : _save,
+                      onPressed: _isBusy ? null : _save,
                       icon: _isSaving
                           ? SizedBox(
                               width: 18,

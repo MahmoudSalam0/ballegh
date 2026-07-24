@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_colors.dart';
-import '../models/report.dart';
-import '../widgets/category_icon.dart';
 import '../database/database_helper.dart';
+import '../models/report.dart';
+import '../services/report_image_storage.dart';
+import '../widgets/category_icon.dart';
+import '../widgets/report_image_picker_card.dart';
 
 class AddReportScreen extends StatefulWidget {
   const AddReportScreen({super.key});
@@ -18,21 +22,101 @@ class _AddReportScreenState extends State<AddReportScreen> {
   final _descriptionController = TextEditingController();
 
   ReportCategory? _selectedCategory;
+  String? _imagePath;
   bool _showCategoryError = false;
   bool _isSaving = false;
+  bool _isProcessingImage = false;
+  bool _imageWasCommitted = false;
+
+  bool get _isBusy => _isSaving || _isProcessingImage;
 
   @override
   void dispose() {
+    if (!_imageWasCommitted) {
+      unawaited(ReportImageStorage.instance.deleteManagedImage(_imagePath));
+    }
     _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
 
   void _selectCategory(ReportCategory category) {
+    if (_isBusy) {
+      return;
+    }
+
     setState(() {
       _selectedCategory = category;
       _showCategoryError = false;
     });
+  }
+
+  Future<void> _chooseImage() async {
+    if (_isBusy) {
+      return;
+    }
+
+    final source = await showReportImageSourceSheet(context);
+    if (!mounted || source == null) {
+      return;
+    }
+
+    setState(() {
+      _isProcessingImage = true;
+    });
+
+    try {
+      final newImagePath = await ReportImageStorage.instance.pickAndStore(
+        source,
+      );
+      if (newImagePath == null) {
+        return;
+      }
+
+      if (!mounted) {
+        await ReportImageStorage.instance.deleteManagedImage(newImagePath);
+        return;
+      }
+
+      final previousImagePath = _imagePath;
+      setState(() {
+        _imagePath = newImagePath;
+      });
+
+      await ReportImageStorage.instance.deleteManagedImage(previousImagePath);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تعذر اختيار الصورة أو حفظها، يرجى المحاولة مرة أخرى',
+            ),
+          ),
+        );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessingImage = false;
+        });
+      }
+    }
+  }
+
+  void _removeImage() {
+    if (_isBusy) {
+      return;
+    }
+
+    final imagePath = _imagePath;
+    setState(() {
+      _imagePath = null;
+    });
+    unawaited(ReportImageStorage.instance.deleteManagedImage(imagePath));
   }
 
   void _showPlaceholderMessage(String message) {
@@ -42,6 +126,10 @@ class _AddReportScreenState extends State<AddReportScreen> {
   }
 
   Future<void> _submit() async {
+    if (_isBusy) {
+      return;
+    }
+
     FocusScope.of(context).unfocus();
 
     final fieldsAreValid = _formKey.currentState?.validate() ?? false;
@@ -65,11 +153,13 @@ class _AddReportScreenState extends State<AddReportScreen> {
         description: _descriptionController.text.trim(),
         category: _selectedCategory!,
         location: 'لم يتم تحديد الموقع',
+        imagePath: _imagePath,
         createdAt: DateTime.now(),
         status: ReportStatus.newReport,
       );
 
       final reportId = await DatabaseHelper.instance.insertReport(report);
+      _imageWasCommitted = true;
 
       if (!mounted) {
         return;
@@ -161,13 +251,12 @@ class _AddReportScreenState extends State<AddReportScreen> {
                       onSelected: _selectCategory,
                     ),
                     const SizedBox(height: 16),
-                    _ImagePlaceholder(
-                      onCameraPressed: () => _showPlaceholderMessage(
-                        'سيتم ربط الصور في مرحلة لاحقة',
-                      ),
-                      onGalleryPressed: () => _showPlaceholderMessage(
-                        'سيتم ربط الصور في مرحلة لاحقة',
-                      ),
+                    ReportImagePickerCard(
+                      imagePath: _imagePath,
+                      isLoading: _isProcessingImage,
+                      enabled: !_isSaving,
+                      onChoose: _chooseImage,
+                      onRemove: _removeImage,
                     ),
                     const SizedBox(height: 16),
                     _DetailsSection(
@@ -185,7 +274,7 @@ class _AddReportScreenState extends State<AddReportScreen> {
                       width: double.infinity,
                       child: FilledButton.icon(
                         key: const Key('submit-report'),
-                        onPressed: _isSaving ? null : _submit,
+                        onPressed: _isBusy ? null : _submit,
                         icon: _isSaving
                             ? SizedBox(
                                 width: 18,
@@ -391,93 +480,6 @@ class _CategoryChoice extends StatelessWidget {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ImagePlaceholder extends StatelessWidget {
-  const _ImagePlaceholder({
-    required this.onCameraPressed,
-    required this.onGalleryPressed,
-  });
-
-  final VoidCallback onCameraPressed;
-  final VoidCallback onGalleryPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          children: [
-            Container(
-              width: 58,
-              height: 58,
-              decoration: BoxDecoration(
-                color: AppColors.accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: const Icon(
-                Icons.add_a_photo_outlined,
-                color: AppColors.primary,
-                size: 29,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              'أضف صورة للمشكلة',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 5),
-            Text(
-              'الصورة تساعد في توضيح البلاغ',
-              textAlign: TextAlign.center,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 16),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final cameraButton = OutlinedButton.icon(
-                  key: const Key('camera-placeholder'),
-                  onPressed: onCameraPressed,
-                  icon: const Icon(Icons.camera_alt_outlined),
-                  label: const Text('التقاط صورة'),
-                );
-                final galleryButton = OutlinedButton.icon(
-                  key: const Key('gallery-placeholder'),
-                  onPressed: onGalleryPressed,
-                  icon: const Icon(Icons.photo_library_outlined),
-                  label: const Text('اختيار من المعرض'),
-                );
-
-                if (constraints.maxWidth < 420) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      cameraButton,
-                      const SizedBox(height: 10),
-                      galleryButton,
-                    ],
-                  );
-                }
-
-                return Row(
-                  children: [
-                    Expanded(child: cameraButton),
-                    const SizedBox(width: 10),
-                    Expanded(child: galleryButton),
-                  ],
-                );
-              },
-            ),
-          ],
         ),
       ),
     );

@@ -21,6 +21,7 @@ class _MainShellState extends State<MainShell> {
   List<Report> _homeReports = [];
   bool _isHomeLoading = true;
   int _reportsRefreshVersion = 0;
+  int _mapRefreshVersion = 0;
 
   @override
   void initState() {
@@ -82,6 +83,7 @@ class _MainShellState extends State<MainShell> {
 
     setState(() {
       _reportsRefreshVersion++;
+      _mapRefreshVersion++;
     });
   }
 
@@ -96,7 +98,7 @@ class _MainShellState extends State<MainShell> {
         isLoading: _isHomeLoading,
       ),
       ReportsScreen(key: ValueKey(_reportsRefreshVersion)),
-      const MapScreen(),
+      MapScreen(refreshVersion: _mapRefreshVersion),
     ];
     return Scaffold(
       body: IndexedStack(index: _selectedIndex, children: screens),
@@ -118,7 +120,12 @@ class _MainShellState extends State<MainShell> {
         child: NavigationBar(
           selectedIndex: _selectedIndex,
           onDestinationSelected: (index) {
-            setState(() => _selectedIndex = index);
+            setState(() {
+              _selectedIndex = index;
+              if (index == 2) {
+                _mapRefreshVersion++;
+              }
+            });
           },
           destinations: const [
             NavigationDestination(

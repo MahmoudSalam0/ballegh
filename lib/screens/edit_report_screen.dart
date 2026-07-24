@@ -5,9 +5,12 @@ import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 import '../database/database_helper.dart';
 import '../models/report.dart';
+import '../models/report_coordinates.dart';
 import '../services/report_image_storage.dart';
 import '../widgets/category_icon.dart';
 import '../widgets/report_image_picker_card.dart';
+import '../widgets/report_location_card.dart';
+import 'location_picker_screen.dart';
 
 class EditReportScreen extends StatefulWidget {
   const EditReportScreen({super.key, required this.report});
@@ -25,13 +28,16 @@ class _EditReportScreenState extends State<EditReportScreen> {
   late final TextEditingController _locationController;
   late ReportCategory _selectedCategory;
   late String? _imagePath;
+  late double? _latitude;
+  late double? _longitude;
 
   bool _showCategoryError = false;
   bool _isSaving = false;
   bool _isProcessingImage = false;
+  bool _isSelectingLocation = false;
   bool _imageChangesWereCommitted = false;
 
-  bool get _isBusy => _isSaving || _isProcessingImage;
+  bool get _isBusy => _isSaving || _isProcessingImage || _isSelectingLocation;
 
   @override
   void initState() {
@@ -43,6 +49,8 @@ class _EditReportScreenState extends State<EditReportScreen> {
     _locationController = TextEditingController(text: widget.report.location);
     _selectedCategory = widget.report.category;
     _imagePath = widget.report.imagePath;
+    _latitude = widget.report.latitude;
+    _longitude = widget.report.longitude;
   }
 
   @override
@@ -140,6 +148,53 @@ class _EditReportScreenState extends State<EditReportScreen> {
     }
   }
 
+  Future<void> _chooseLocation() async {
+    if (_isBusy) {
+      return;
+    }
+
+    setState(() {
+      _isSelectingLocation = true;
+    });
+
+    try {
+      final coordinates = await Navigator.of(context).push<ReportCoordinates>(
+        MaterialPageRoute<ReportCoordinates>(
+          builder: (context) => LocationPickerScreen(
+            initialLatitude: _latitude,
+            initialLongitude: _longitude,
+          ),
+        ),
+      );
+
+      if (!mounted || coordinates == null) {
+        return;
+      }
+
+      setState(() {
+        _latitude = coordinates.latitude;
+        _longitude = coordinates.longitude;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSelectingLocation = false;
+        });
+      }
+    }
+  }
+
+  void _removeLocation() {
+    if (_isBusy) {
+      return;
+    }
+
+    setState(() {
+      _latitude = null;
+      _longitude = null;
+    });
+  }
+
   Future<void> _save() async {
     if (_isBusy) {
       return;
@@ -168,8 +223,8 @@ class _EditReportScreenState extends State<EditReportScreen> {
       description: _descriptionController.text.trim(),
       category: _selectedCategory,
       location: _locationController.text.trim(),
-      latitude: widget.report.latitude,
-      longitude: widget.report.longitude,
+      latitude: _latitude,
+      longitude: _longitude,
       imagePath: _imagePath,
       createdAt: widget.report.createdAt,
       status: widget.report.status,
@@ -294,6 +349,15 @@ class _EditReportScreenState extends State<EditReportScreen> {
                       descriptionController: _descriptionController,
                       locationController: _locationController,
                       enabled: !_isBusy,
+                    ),
+                    const SizedBox(height: 16),
+                    ReportLocationCard(
+                      latitude: _latitude,
+                      longitude: _longitude,
+                      isLoading: _isSelectingLocation,
+                      enabled: !_isSaving && !_isProcessingImage,
+                      onOpen: _chooseLocation,
+                      onRemove: _removeLocation,
                     ),
                     const SizedBox(height: 24),
                     FilledButton.icon(

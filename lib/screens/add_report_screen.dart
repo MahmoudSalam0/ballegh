@@ -5,9 +5,12 @@ import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 import '../database/database_helper.dart';
 import '../models/report.dart';
+import '../models/report_coordinates.dart';
 import '../services/report_image_storage.dart';
 import '../widgets/category_icon.dart';
+import '../widgets/report_location_card.dart';
 import '../widgets/report_image_picker_card.dart';
+import 'location_picker_screen.dart';
 
 class AddReportScreen extends StatefulWidget {
   const AddReportScreen({super.key});
@@ -23,12 +26,15 @@ class _AddReportScreenState extends State<AddReportScreen> {
 
   ReportCategory? _selectedCategory;
   String? _imagePath;
+  double? _latitude;
+  double? _longitude;
   bool _showCategoryError = false;
   bool _isSaving = false;
   bool _isProcessingImage = false;
+  bool _isSelectingLocation = false;
   bool _imageWasCommitted = false;
 
-  bool get _isBusy => _isSaving || _isProcessingImage;
+  bool get _isBusy => _isSaving || _isProcessingImage || _isSelectingLocation;
 
   @override
   void dispose() {
@@ -119,10 +125,51 @@ class _AddReportScreenState extends State<AddReportScreen> {
     unawaited(ReportImageStorage.instance.deleteManagedImage(imagePath));
   }
 
-  void _showPlaceholderMessage(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+  Future<void> _chooseLocation() async {
+    if (_isBusy) {
+      return;
+    }
+
+    setState(() {
+      _isSelectingLocation = true;
+    });
+
+    try {
+      final coordinates = await Navigator.of(context).push<ReportCoordinates>(
+        MaterialPageRoute<ReportCoordinates>(
+          builder: (context) => LocationPickerScreen(
+            initialLatitude: _latitude,
+            initialLongitude: _longitude,
+          ),
+        ),
+      );
+
+      if (!mounted || coordinates == null) {
+        return;
+      }
+
+      setState(() {
+        _latitude = coordinates.latitude;
+        _longitude = coordinates.longitude;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSelectingLocation = false;
+        });
+      }
+    }
+  }
+
+  void _removeLocation() {
+    if (_isBusy) {
+      return;
+    }
+
+    setState(() {
+      _latitude = null;
+      _longitude = null;
+    });
   }
 
   Future<void> _submit() async {
@@ -153,6 +200,8 @@ class _AddReportScreenState extends State<AddReportScreen> {
         description: _descriptionController.text.trim(),
         category: _selectedCategory!,
         location: 'لم يتم تحديد الموقع',
+        latitude: _latitude,
+        longitude: _longitude,
         imagePath: _imagePath,
         createdAt: DateTime.now(),
         status: ReportStatus.newReport,
@@ -264,10 +313,13 @@ class _AddReportScreenState extends State<AddReportScreen> {
                       descriptionController: _descriptionController,
                     ),
                     const SizedBox(height: 16),
-                    _LocationPlaceholder(
-                      onPressed: () => _showPlaceholderMessage(
-                        'سيتم ربط الموقع في مرحلة لاحقة',
-                      ),
+                    ReportLocationCard(
+                      latitude: _latitude,
+                      longitude: _longitude,
+                      isLoading: _isSelectingLocation,
+                      enabled: !_isSaving && !_isProcessingImage,
+                      onOpen: _chooseLocation,
+                      onRemove: _removeLocation,
                     ),
                     const SizedBox(height: 24),
                     SizedBox(
@@ -554,70 +606,6 @@ class _DetailsSection extends StatelessWidget {
                 }
                 return null;
               },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LocationPlaceholder extends StatelessWidget {
-  const _LocationPlaceholder({required this.onPressed});
-
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.09),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Icon(
-                    Icons.location_on_outlined,
-                    color: AppColors.primary,
-                    size: 26,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'موقع المشكلة',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'لم يتم تحديد الموقع',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              key: const Key('location-placeholder'),
-              onPressed: onPressed,
-              icon: const Icon(Icons.my_location_rounded),
-              label: const Text('تحديد موقعي الحالي'),
             ),
           ],
         ),

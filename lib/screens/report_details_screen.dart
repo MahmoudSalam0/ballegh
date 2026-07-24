@@ -1,9 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/theme/app_colors.dart';
 import '../database/database_helper.dart';
 import '../models/report.dart';
+import '../models/report_coordinates.dart';
 import '../services/report_image_storage.dart';
+import '../utils/report_location_text.dart';
 import '../widgets/report_image.dart';
 import '../widgets/status_chip.dart';
 import 'edit_report_screen.dart';
@@ -165,10 +172,46 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
     }
   }
 
+  Future<void> _openExternalMap() async {
+    if (!ReportCoordinates.areValid(_report.latitude, _report.longitude)) {
+      return;
+    }
+
+    final uri = Uri.https('www.google.com', '/maps/search/', {
+      'api': '1',
+      'query': '${_report.latitude},${_report.longitude}',
+    });
+
+    try {
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!mounted) {
+        return;
+      }
+
+      if (!opened) {
+        _showMapLaunchError();
+      }
+    } catch (_) {
+      if (mounted) {
+        _showMapLaunchError();
+      }
+    }
+  }
+
+  void _showMapLaunchError() {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('تعذر فتح الموقع في تطبيق الخرائط')),
+      );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final hasCoordinates =
-        _report.latitude != null || _report.longitude != null;
+    final hasCoordinates = ReportCoordinates.areValid(
+      _report.latitude,
+      _report.longitude,
+    );
 
     return PopScope<bool>(
       canPop: !_isDeleting,
@@ -226,7 +269,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                           _InformationRow(
                             icon: Icons.location_on_outlined,
                             label: 'الموقع',
-                            value: _report.location,
+                            value: reportLocationText(_report),
                           ),
                           const Divider(height: 28),
                           _InformationRow(
@@ -237,13 +280,15 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                         ],
                       ),
                     ),
-                    if (hasCoordinates) ...[
-                      const SizedBox(height: 16),
-                      _CoordinatesCard(
-                        latitude: _report.latitude,
-                        longitude: _report.longitude,
-                      ),
-                    ],
+                    const SizedBox(height: 16),
+                    if (hasCoordinates)
+                      _ReportLocationMapCard(
+                        latitude: _report.latitude!,
+                        longitude: _report.longitude!,
+                        onOpenExternalMap: _openExternalMap,
+                      )
+                    else
+                      const _NoReportLocationCard(),
                     if (_report.id != null) ...[
                       const SizedBox(height: 24),
                       OutlinedButton.icon(
@@ -454,35 +499,154 @@ class _InformationRow extends StatelessWidget {
   }
 }
 
-class _CoordinatesCard extends StatelessWidget {
-  const _CoordinatesCard({required this.latitude, required this.longitude});
+class _ReportLocationMapCard extends StatelessWidget {
+  const _ReportLocationMapCard({
+    required this.latitude,
+    required this.longitude,
+    required this.onOpenExternalMap,
+  });
 
-  final double? latitude;
-  final double? longitude;
+  final double latitude;
+  final double longitude;
+  final VoidCallback onOpenExternalMap;
 
   @override
   Widget build(BuildContext context) {
+    final point = LatLng(latitude, longitude);
+
     return _DetailsCard(
-      title: 'الإحداثيات',
-      icon: Icons.my_location_rounded,
-      child: Wrap(
-        spacing: 24,
-        runSpacing: 12,
+      title: 'موقع البلاغ',
+      icon: Icons.map_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (latitude != null)
-            _CoordinateValue(
-              label: 'خط العرض',
-              value: latitude!.toStringAsFixed(6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: SizedBox(
+              height: 220,
+              child: FlutterMap(
+                options: MapOptions(
+                  initialCenter: point,
+                  initialZoom: 16,
+                  interactionOptions: const InteractionOptions(
+                    flags: InteractiveFlag.none,
+                  ),
+                ),
+                children: [
+                  TileLayer(
+                    urlTemplate:
+                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.example.ballegh_app',
+                  ),
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: point,
+                        width: 48,
+                        height: 48,
+                        child: const _DetailsLocationMarker(),
+                      ),
+                    ],
+                  ),
+                  RichAttributionWidget(
+                    attributions: [
+                      TextSourceAttribution(
+                        'OpenStreetMap contributors',
+                        onTap: _openOpenStreetMapCopyright,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          if (longitude != null)
-            _CoordinateValue(
-              label: 'خط الطول',
-              value: longitude!.toStringAsFixed(6),
-            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'قد لا تظهر بلاطات الخريطة عند عدم توفر اتصال بالإنترنت.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 24,
+            runSpacing: 12,
+            children: [
+              _CoordinateValue(
+                label: 'خط العرض',
+                value: latitude.toStringAsFixed(6),
+              ),
+              _CoordinateValue(
+                label: 'خط الطول',
+                value: longitude.toStringAsFixed(6),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: onOpenExternalMap,
+            icon: const Icon(Icons.open_in_new_rounded),
+            label: const Text('فتح في الخرائط'),
+          ),
         ],
       ),
     );
   }
+}
+
+class _NoReportLocationCard extends StatelessWidget {
+  const _NoReportLocationCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _DetailsCard(
+      title: 'موقع البلاغ',
+      icon: Icons.location_off_outlined,
+      child: Row(
+        children: [
+          Icon(Icons.info_outline_rounded, color: AppColors.textSecondary),
+          SizedBox(width: 8),
+          Expanded(child: Text('لم يتم تحديد موقع لهذا البلاغ')),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailsLocationMarker extends StatelessWidget {
+  const _DetailsLocationMarker();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.accent,
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.surface, width: 3),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 7,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: const Icon(
+        Icons.location_on_rounded,
+        color: AppColors.textPrimary,
+        size: 28,
+      ),
+    );
+  }
+}
+
+void _openOpenStreetMapCopyright() {
+  unawaited(
+    launchUrl(
+      Uri.parse('https://www.openstreetmap.org/copyright'),
+      mode: LaunchMode.externalApplication,
+    ),
+  );
 }
 
 class _CoordinateValue extends StatelessWidget {

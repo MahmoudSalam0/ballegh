@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/theme/app_colors.dart';
 import '../models/report.dart';
+import '../utils/report_location_text.dart';
 import 'category_icon.dart';
 import 'report_image.dart';
 import 'status_chip.dart';
@@ -83,7 +84,7 @@ class ReportCard extends StatelessWidget {
                 children: [
                   _MetadataItem(
                     icon: Icons.location_on_outlined,
-                    text: report.location,
+                    text: reportLocationText(report),
                   ),
                   _MetadataItem(
                     icon: Icons.calendar_today_outlined,

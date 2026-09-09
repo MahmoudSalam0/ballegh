@@ -7,7 +7,7 @@ import '../database/database_helper.dart';
 import '../models/report.dart';
 import '../models/report_coordinates.dart';
 import '../services/report_image_storage.dart';
-import '../widgets/category_icon.dart';
+import '../widgets/category_select_card.dart';
 import '../widgets/report_image_picker_card.dart';
 import '../widgets/report_location_card.dart';
 import 'location_picker_screen.dart';
@@ -431,7 +431,8 @@ class _EditCategorySection extends StatelessWidget {
                     for (final category in ReportCategory.values)
                       SizedBox(
                         width: itemWidth,
-                        child: _EditCategoryChoice(
+                        child: CategorySelectCard(
+                          key: Key('edit-category-${category.name}'),
                           category: category,
                           selected: selectedCategory == category,
                           enabled: enabled,
@@ -462,68 +463,6 @@ class _EditCategorySection extends StatelessWidget {
               ),
             ],
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EditCategoryChoice extends StatelessWidget {
-  const _EditCategoryChoice({
-    required this.category,
-    required this.selected,
-    required this.enabled,
-    required this.onTap,
-  });
-
-  final ReportCategory category;
-  final bool selected;
-  final bool enabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      selected: selected,
-      enabled: enabled,
-      label: category.label,
-      child: Material(
-        color: selected
-            ? AppColors.primary.withValues(alpha: 0.07)
-            : AppColors.background,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(
-            color: selected ? AppColors.primary : AppColors.border,
-            width: selected ? 1.5 : 1,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          key: Key('edit-category-${category.name}'),
-          onTap: enabled ? onTap : null,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CategoryIcon(category: category),
-                const SizedBox(height: 8),
-                Text(
-                  category.label,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: selected ? AppColors.primary : AppColors.textPrimary,
-                    fontWeight: FontWeight.w700,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
         ),
       ),
     );
